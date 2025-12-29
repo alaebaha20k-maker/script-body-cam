@@ -1016,22 +1016,46 @@
                 const prompt = `You are a viral video title expert specializing in accountability content.
 
 Generate ONE unique title following this EXACT formula:
-[Authority Figure] [Violation Verb] [Identity Marker] [High-Status Victim] -- [Extreme Consequence]
+"Rookie Cop [Violation Verb] Black [High-Status Victim] -- Now It's Cost Him [Consequence]"
 
-RULES:
-- Authority figures: Cop, Police Officer, Security Guard, TSA Agent, Border Patrol Agent, Mall Cop, Airport Security, etc.
-- Violation verbs: Illegally Arrests, Racially Profiles, Assaults, Kicks Out, Falsely Accuses, Harasses, Threatens, etc.
-- Identity markers: Black, Latino, Asian, Disabled, Veteran, Elderly (use when relevant for impact)
-- High-status victims: Federal Judge, Supreme Court Judge, FBI Agent, Police Chief, Federal Prosecutor, DEA Agent, Secret Service Agent, US Marshal, etc.
-- Consequences: [X] Years Prison, Career Over, Fired, Career Destroyed, Badge Revoked, Life Ruined (with specific numbers for prison sentences)
+STRICT RULES:
+- ALWAYS start with: "Rookie Cop"
+- ALWAYS use "Black" as the identity marker
+- ALWAYS end with: "Now It's Cost Him [His Career/Everything/His Badge/His Freedom], [X] Years Prison"
 
-VARIETY REQUIREMENTS:
-- Mix different authority types
-- Mix different violation types
-- Mix different victim types
-- Mix consequence styles
-- Create unique combinations
-${customPrompt}
+VIOLATION VERBS (choose one):
+- Illegally Arrests
+- Racially Profiles
+- Assaults
+- Falsely Accuses
+- Harasses
+- Threatens
+- Kicks Out
+
+HIGH-STATUS VICTIMS (choose one):
+- Federal Judge
+- Supreme Court Judge
+- FBI Agent
+- Police Chief
+- Federal Prosecutor
+- DEA Agent
+- Secret Service Agent
+- US Marshal
+- Attorney General
+- District Attorney
+${customizations.victimType ? `\nPREFERRED: ${customizations.victimType}` : ''}
+
+CONSEQUENCE OPTIONS:
+- "Now It's Cost Him His Career, [12-20] Years Prison"
+- "Now It's Cost Him Everything, [12-20] Years Prison"
+- "Now It's Cost Him His Badge, [12-20] Years Prison"
+- "Now It's Cost Him His Freedom, [12-20] Years Prison"
+
+EXAMPLES:
+- "Rookie Cop Racially Profiles Black Federal Judge -- Now It's Cost Him His Career, 15 Years Prison"
+- "Rookie Cop Illegally Arrests Black Police Chief -- Now It's Cost Him Everything, 18 Years Prison"
+- "Rookie Cop Assaults Black FBI Agent -- Now It's Cost Him His Badge, 16 Years Prison"
+${customizations.storyFocus ? `\nSTORY FOCUS: ${customizations.storyFocus}` : ''}
 
 PREVIOUSLY GENERATED TITLES (DO NOT REPEAT ANY OF THESE):
 ${previousTitles || 'None yet'}
@@ -1054,6 +1078,64 @@ Generate ONE completely new and unique title now. Return ONLY the title, nothing
             }
 
             throw new Error('Could not generate unique title after maximum attempts');
+        }
+
+        // ===============================================
+        // CHARACTER NAME GENERATION
+        // ===============================================
+        async function generateCharacterNames(title) {
+            addLog('Generating character names...');
+
+            const prompt = `Based on this video title, generate realistic character names:
+
+TITLE: ${title}
+
+Generate:
+1. A realistic full name for the rookie cop (first and last name)
+2. A realistic full name for the victim (first and last name)
+
+RULES:
+- Cop name should sound like a typical American police officer name
+- Victim name should be appropriate for a Black professional (the victim is Black as per the title)
+- Use realistic, common American names
+- Return in this EXACT format (two lines only):
+COP: [First Last]
+VICTIM: [First Last]
+
+Generate the names now:`;
+
+            try {
+                const response = await callGeminiAPI(prompt);
+                const lines = response.split('\n').filter(l => l.trim());
+
+                let copName = '';
+                let victimName = '';
+
+                for (const line of lines) {
+                    if (line.includes('COP:')) {
+                        copName = line.replace('COP:', '').trim();
+                    } else if (line.includes('VICTIM:')) {
+                        victimName = line.replace('VICTIM:', '').trim();
+                    }
+                }
+
+                if (!copName || !victimName) {
+                    throw new Error('Failed to parse character names');
+                }
+
+                addLog(`✓ Character names: Officer ${copName} & ${victimName}`, 'success');
+
+                return {
+                    copName: copName,
+                    victimName: victimName
+                };
+            } catch (error) {
+                addLog(`Warning: Using default names due to error: ${error.message}`, 'warning');
+                return {
+                    copName: 'Derek Paulson',
+                    victimName: 'Marcus Thompson'
+                };
+            }
         }
 
         // ===============================================
@@ -1083,24 +1165,29 @@ Generate ONE completely new and unique title now. Return ONLY the title, nothing
             const startTime = Date.now();
 
             try {
-                // Step 1: Generate unique title (10%)
-                addLog('Step 1/4: Generating unique title...');
+                // Step 1: Generate unique title (8%)
+                addLog('Step 1/5: Generating unique title...');
                 const title = await generateUniqueTitle(customizations);
-                updateProgress(10);
+                updateProgress(8);
 
-                // Step 2: Generate Part 1 - Hook & Setup (30%)
-                addLog('Step 2/4: Generating Part 1 (Hook & Character Setup)...');
-                const part1 = await generateScriptPart1(title, selectedLength);
+                // Step 2: Generate character names (15%)
+                addLog('Step 2/5: Generating character names...');
+                const characters = await generateCharacterNames(title);
+                updateProgress(15);
+
+                // Step 3: Generate Part 1 - Hook & Setup (40%)
+                addLog('Step 3/5: Generating Part 1 (Hook & Character Setup)...');
+                const part1 = await generateScriptPart1(title, selectedLength, characters);
                 updateProgress(40);
 
-                // Step 3: Generate Part 2 - Incident Detail (60%)
-                addLog('Step 3/4: Generating Part 2 (Incident & Confrontation)...');
-                const part2 = await generateScriptPart2(title, selectedLength, part1);
-                updateProgress(70);
+                // Step 4: Generate Part 2 - Incident Detail (65%)
+                addLog('Step 4/5: Generating Part 2 (Incident & Confrontation)...');
+                const part2 = await generateScriptPart2(title, selectedLength, part1, characters);
+                updateProgress(65);
 
-                // Step 4: Generate Part 3 - Consequences (90%)
-                addLog('Step 4/4: Generating Part 3 (Consequences & Aftermath)...');
-                const part3 = await generateScriptPart3(title, selectedLength, part2);
+                // Step 5: Generate Part 3 - Consequences (90%)
+                addLog('Step 5/5: Generating Part 3 (Consequences & Aftermath)...');
+                const part3 = await generateScriptPart3(title, selectedLength, part2, characters);
                 updateProgress(90);
 
                 // Combine and clean
@@ -1147,13 +1234,26 @@ Generate ONE completely new and unique title now. Return ONLY the title, nothing
             }
         }
 
-        async function generateScriptPart1(title, totalLength) {
+        async function generateScriptPart1(title, totalLength, characters) {
             const targetLength = Math.floor(totalLength / 3);
+
+            // Extract victim title from the title string
+            const victimTitle = title.match(/Black\s+([^-]+)\s+--/)?.[1]?.trim() || 'Federal Judge';
 
             const prompt = `You are an expert scriptwriter for viral accountability documentaries.
 
 TITLE: ${title}
 TARGET: ${targetLength} characters minimum
+
+═══════════════════════════════════════
+CHARACTER NAMES - DO NOT CHANGE:
+Officer: ${characters.copName}
+Victim: ${characters.victimName}, ${victimTitle}
+═══════════════════════════════════════
+
+Use these EXACT names throughout the entire script.
+Never introduce different names.
+Never change these names.
 
 Write the opening section following this EXACT structure:
 
@@ -1200,13 +1300,26 @@ Write ${targetLength} characters minimum.`;
             return await callGeminiAPI(prompt);
         }
 
-        async function generateScriptPart2(title, totalLength, previousPart) {
+        async function generateScriptPart2(title, totalLength, previousPart, characters) {
             const targetLength = Math.floor(totalLength / 3);
             const lastSentences = previousPart.split('.').slice(-4).join('.').trim();
+
+            // Extract victim title from the title string
+            const victimTitle = title.match(/Black\s+([^-]+)\s+--/)?.[1]?.trim() || 'Federal Judge';
 
             const prompt = `Continue the bodycam accountability script seamlessly.
 
 TITLE: ${title}
+
+═══════════════════════════════════════
+CHARACTER NAMES - DO NOT CHANGE:
+Officer: ${characters.copName}
+Victim: ${characters.victimName}, ${victimTitle}
+═══════════════════════════════════════
+
+Use these EXACT names throughout the entire script.
+Never introduce different names.
+Never change these names.
 
 PREVIOUS SECTION ENDED WITH:
 ${lastSentences}
@@ -1246,13 +1359,26 @@ Continue seamlessly. Write ${targetLength} characters minimum.`;
             return await callGeminiAPI(prompt);
         }
 
-        async function generateScriptPart3(title, totalLength, previousPart) {
+        async function generateScriptPart3(title, totalLength, previousPart, characters) {
             const targetLength = Math.floor(totalLength / 3);
             const lastSentences = previousPart.split('.').slice(-4).join('.').trim();
+
+            // Extract victim title from the title string
+            const victimTitle = title.match(/Black\s+([^-]+)\s+--/)?.[1]?.trim() || 'Federal Judge';
 
             const prompt = `Complete the bodycam accountability script powerfully.
 
 TITLE: ${title}
+
+═══════════════════════════════════════
+CHARACTER NAMES - DO NOT CHANGE:
+Officer: ${characters.copName}
+Victim: ${characters.victimName}, ${victimTitle}
+═══════════════════════════════════════
+
+Use these EXACT names throughout the entire script.
+Never introduce different names.
+Never change these names.
 
 PREVIOUS SECTION ENDED WITH:
 ${lastSentences}
